@@ -1,9 +1,10 @@
 ﻿// Copyright (c) 2023 Vladimir Popov zor1994@gmail.com https://github.com/ZorPastaman/UtilityAI
 
 using System;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
-using UnityEngine.Profiling;
+using Unity.Profiling;
 using Zor.SimpleBlackboard.Core;
 
 namespace Zor.UtilityAI.Core
@@ -13,6 +14,32 @@ namespace Zor.UtilityAI.Core
 	/// </summary>
 	public abstract class Action
 	{
+        private static readonly ProfilerMarker ActionInitializeMarker = new($"{nameof(Action)}.{nameof(Initialize)}");
+        private static readonly ProfilerMarker ActionBeginMarker = new($"{nameof(Action)}.{nameof(Begin)}");
+        private static readonly ProfilerMarker ActionTickMarker = new($"{nameof(Action)}.{nameof(Tick)}");
+        private static readonly ProfilerMarker ActionEndMarker = new($"{nameof(Action)}.{nameof(End)}");
+        private static readonly ProfilerMarker ActionCreateMarker = new($"{nameof(Action)}.{nameof(Create)}");
+        private static readonly ProfilerMarker ActionSetupMarker = new($"{nameof(Action)}.Setup");
+
+#if ENABLE_PROFILER
+        private static readonly ConcurrentDictionary<Type, ProfilerMarker> ActionMarkers = new();
+        internal static ProfilerMarker GetActionMarker(Action consideration)
+        {
+            return GetActionMarker(consideration.GetType());
+        }
+
+        internal static ProfilerMarker GetActionMarker<T>()
+            where T : Action
+        {
+            return GetActionMarker(typeof(T));
+        }
+
+        internal static ProfilerMarker GetActionMarker(Type type)
+        {
+            return ActionMarkers.GetOrAdd(type, static actionType => new ProfilerMarker(actionType.FullName));
+        }
+#endif
+
 		/// <summary>
 		/// Used <see cref="Blackboard"/>. Set via <see cref="Brain"/>.
 		/// </summary>
@@ -70,11 +97,17 @@ namespace Zor.UtilityAI.Core
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void Initialize()
 		{
-			Profiler.BeginSample(GetType().FullName);
-
-			OnInitialize();
-
-			Profiler.EndSample();
+            using (ActionInitializeMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker(this).Auto())
+                {
+#endif
+                    OnInitialize();
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -83,13 +116,17 @@ namespace Zor.UtilityAI.Core
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void Begin()
 		{
-			Profiler.BeginSample("Action.Begin");
-			Profiler.BeginSample(GetType().FullName);
-
-			OnBegin();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
+            using (ActionBeginMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker(this).Auto())
+                {
+#endif
+                    OnBegin();
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -98,13 +135,17 @@ namespace Zor.UtilityAI.Core
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void Tick()
 		{
-			Profiler.BeginSample("Action.Tick");
-			Profiler.BeginSample(GetType().FullName);
-
-			OnTick();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
+            using (ActionTickMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker(this).Auto())
+                {
+#endif
+                    OnTick();
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -113,13 +154,17 @@ namespace Zor.UtilityAI.Core
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void End()
 		{
-			Profiler.BeginSample("Action.End");
-			Profiler.BeginSample(GetType().FullName);
-
-			OnEnd();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
+            using (ActionEndMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker(this).Auto())
+                {
+#endif
+                    OnEnd();
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -128,11 +173,14 @@ namespace Zor.UtilityAI.Core
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void Dispose()
 		{
-			Profiler.BeginSample(GetType().FullName);
-
-			OnDispose();
-
-			Profiler.EndSample();
+#if ENABLE_PROFILER
+            using (GetActionMarker(this).Auto())
+            {
+#endif
+                OnDispose();
+#if ENABLE_PROFILER
+            }
+#endif
 		}
 
 		/// <summary>
@@ -153,15 +201,19 @@ namespace Zor.UtilityAI.Core
 		[NotNull]
 		public static TAction Create<TAction>() where TAction : Action, INotSetupable, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -174,19 +226,24 @@ namespace Zor.UtilityAI.Core
 		[NotNull]
 		public static TAction Create<TAction, TArg>([CanBeNull] TArg arg) where TAction : Action, ISetupable<TArg>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
+                        action.Setup(arg);
+                    }
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg);
-			Profiler.EndSample();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -202,19 +259,24 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1)
 			where TAction : Action, ISetupable<TArg0, TArg1>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
+                        action.Setup(arg0, arg1);
+                    }
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1);
-			Profiler.EndSample();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -232,19 +294,24 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1, TArg2>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1, [CanBeNull] TArg2 arg2)
 			where TAction : Action, ISetupable<TArg0, TArg1, TArg2>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
+                        action.Setup(arg0, arg1, arg2);
+                    }
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1, arg2);
-			Profiler.EndSample();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -264,19 +331,24 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1, TArg2, TArg3>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1, [CanBeNull] TArg2 arg2, [CanBeNull] TArg3 arg3)
 			where TAction : Action, ISetupable<TArg0, TArg1, TArg2, TArg3>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
+                        action.Setup(arg0, arg1, arg2, arg3);
+                    }
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1, arg2, arg3);
-			Profiler.EndSample();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -298,19 +370,24 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1, TArg2, TArg3, TArg4>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1, [CanBeNull] TArg2 arg2, [CanBeNull] TArg3 arg3, [CanBeNull] TArg4 arg4)
 			where TAction : Action, ISetupable<TArg0, TArg1, TArg2, TArg3, TArg4>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
+                        action.Setup(arg0, arg1, arg2, arg3, arg4);
+                    }
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1, arg2, arg3, arg4);
-			Profiler.EndSample();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -334,19 +411,25 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1, TArg2, TArg3, TArg4, TArg5>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1, [CanBeNull] TArg2 arg2, [CanBeNull] TArg3 arg3, [CanBeNull] TArg4 arg4, [CanBeNull] TArg5 arg5)
 			where TAction : Action, ISetupable<TArg0, TArg1, TArg2, TArg3, TArg4, TArg5>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1, arg2, arg3, arg4, arg5);
-			Profiler.EndSample();
+                        action.Setup(arg0, arg1, arg2, arg3, arg4, arg5);
+                    }
 
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -372,19 +455,24 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1, TArg2, TArg3, TArg4, TArg5, TArg6>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1, [CanBeNull] TArg2 arg2, [CanBeNull] TArg3 arg3, [CanBeNull] TArg4 arg4, [CanBeNull] TArg5 arg5, [CanBeNull] TArg6 arg6)
 			where TAction : Action, ISetupable<TArg0, TArg1, TArg2, TArg3, TArg4, TArg5, TArg6>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
+                        action.Setup(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+                    }
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
-			Profiler.EndSample();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -412,19 +500,25 @@ namespace Zor.UtilityAI.Core
 		public static TAction Create<TAction, TArg0, TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7>([CanBeNull] TArg0 arg0, [CanBeNull] TArg1 arg1, [CanBeNull] TArg2 arg2, [CanBeNull] TArg3 arg3, [CanBeNull] TArg4 arg4, [CanBeNull] TArg5 arg5, [CanBeNull] TArg6 arg6, [CanBeNull] TArg7 arg7)
 			where TAction : Action, ISetupable<TArg0, TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7>, new()
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(typeof(TAction).FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker<TAction>().Auto())
+                {
+#endif
+                    var action = new TAction();
 
-			var action = new TAction();
+                    using (ActionSetupMarker.Auto())
+                    {
 
-			Profiler.BeginSample("Setup");
-			action.Setup(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-			Profiler.EndSample();
+                        action.Setup(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                    }
 
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -438,15 +532,19 @@ namespace Zor.UtilityAI.Core
 		[NotNull]
 		public static Action Create([NotNull] Type type)
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(type.FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker(type).Auto())
+                {
+#endif
+                    var action = (Action)Activator.CreateInstance(type);
 
-			var action = (Action)Activator.CreateInstance(type);
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 
 		/// <summary>
@@ -458,16 +556,20 @@ namespace Zor.UtilityAI.Core
 		[NotNull]
 		public static Action Create([NotNull] Type type, [NotNull, ItemCanBeNull] params object[] parameters)
 		{
-			Profiler.BeginSample("Action.Create");
-			Profiler.BeginSample(type.FullName);
+            using (ActionCreateMarker.Auto())
+            {
+#if ENABLE_PROFILER
+                using (GetActionMarker(type).Auto())
+                {
+#endif
+                    var action = (Action)Activator.CreateInstance(type);
+                    SetupableHelper.CreateSetup(action, parameters);
 
-			var action = (Action)Activator.CreateInstance(type);
-			SetupableHelper.CreateSetup(action, parameters);
-
-			Profiler.EndSample();
-			Profiler.EndSample();
-
-			return action;
+                    return action;
+#if ENABLE_PROFILER
+                }
+#endif
+            }
 		}
 	}
 }

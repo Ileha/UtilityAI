@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
-using UnityEngine.Profiling;
+using Unity.Profiling;
 using Zor.SimpleBlackboard.Core;
 using Zor.UtilityAI.Debugging;
 
@@ -15,6 +15,19 @@ namespace Zor.UtilityAI.Core
 	/// </summary>
 	public sealed class Brain : IDisposable
 	{
+		private static readonly ProfilerMarker BrainInitializeMarker = new($"{nameof(Brain)}.{nameof(Initialize)}");
+		private static readonly ProfilerMarker BrainTickMarker = new($"{nameof(Brain)}.{nameof(Tick)}");
+		private static readonly ProfilerMarker BrainDisposeMarker = new($"{nameof(Brain)}.{nameof(Dispose)}");
+		private static readonly ProfilerMarker BrainInitializeConsiderationsMarker = new($"{nameof(Brain)}.{nameof(InitializeConsiderations)}");
+		private static readonly ProfilerMarker BrainInitializeActionsMarker = new($"{nameof(Brain)}.{nameof(InitializeActions)}");
+		private static readonly ProfilerMarker BrainUpdateUtilitiesMarker = new($"{nameof(Brain)}.{nameof(UpdateUtilities)}");
+		private static readonly ProfilerMarker BrainUpdateActionUtilitiesMarker = new($"{nameof(Brain)}.{nameof(UpdateActionUtilities)}");
+		private static readonly ProfilerMarker BrainFindBestActionIndexMarker = new($"{nameof(Brain)}.{nameof(FindBestActionIndex)}");
+		private static readonly ProfilerMarker BrainTrySwitchActionMarker = new($"{nameof(Brain)}.Try{nameof(SwitchAction)}");
+		private static readonly ProfilerMarker BrainSwitchActionMarker = new($"{nameof(Brain)}.{nameof(SwitchAction)}");
+		private static readonly ProfilerMarker BrainDisposeConsiderationsMarker = new($"{nameof(Brain)}.{nameof(DisposeConsiderations)}");
+		private static readonly ProfilerMarker BrainDisposeActionsMarker = new($"{nameof(Brain)}.{nameof(DisposeActions)}");
+
 		/// <summary>
 		/// Considerations.
 		/// </summary>
@@ -106,16 +119,15 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		public void Initialize()
 		{
-			Profiler.BeginSample("Brain.Initialize");
-
-			InitializeConsiderations();
-			InitializeActions();
-			UpdateUtilities();
-			UpdateActionUtilities();
-			m_currentActionIndex = FindBestActionIndex();
-			m_actions[m_currentActionIndex].Begin();
-
-			Profiler.EndSample();
+			using (BrainInitializeMarker.Auto())
+			{
+                InitializeConsiderations();
+                InitializeActions();
+                UpdateUtilities();
+                UpdateActionUtilities();
+                m_currentActionIndex = FindBestActionIndex();
+                m_actions[m_currentActionIndex].Begin();
+			}
 		}
 
 		/// <summary>
@@ -126,15 +138,14 @@ namespace Zor.UtilityAI.Core
 		/// </remarks>
 		public void Tick()
 		{
-			Profiler.BeginSample("Brain.Tick");
-
-			UpdateUtilities();
-			UpdateActionUtilities();
-			int bestActionIndex = FindBestActionIndex();
-			SwitchAction(bestActionIndex);
-			m_actions[m_currentActionIndex].Tick();
-
-			Profiler.EndSample();
+            using (BrainTickMarker.Auto())
+            {
+                UpdateUtilities();
+                UpdateActionUtilities();
+                int bestActionIndex = FindBestActionIndex();
+                SwitchAction(bestActionIndex);
+                m_actions[m_currentActionIndex].Tick();
+            }
 		}
 
 		/// <summary>
@@ -142,12 +153,11 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		public void Dispose()
 		{
-			Profiler.BeginSample("Brain.Dispose");
-
-			DisposeConsiderations();
-			DisposeActions();
-
-			Profiler.EndSample();
+            using (BrainDisposeMarker.Auto())
+            {
+                DisposeConsiderations();
+                DisposeActions();
+            }
 		}
 
 		/// <summary>
@@ -209,14 +219,13 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		private void InitializeConsiderations()
 		{
-			Profiler.BeginSample("Brain.InitializeConsiderations");
-
-			for (int i = 0, count = m_considerations.Length; i < count; ++i)
-			{
-				m_considerations[i].Initialize();
-			}
-
-			Profiler.EndSample();
+            using (BrainInitializeConsiderationsMarker.Auto())
+            {
+                for (int i = 0, count = m_considerations.Length; i < count; ++i)
+                {
+                    m_considerations[i].Initialize();
+                }
+            }
 		}
 
 		/// <summary>
@@ -224,14 +233,13 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		private void InitializeActions()
 		{
-			Profiler.BeginSample("Brain.InitializeActions");
-
-			for (int i = 0, count = m_actions.Length; i < count; ++i)
-			{
-				m_actions[i].Initialize();
-			}
-
-			Profiler.EndSample();
+            using (BrainInitializeActionsMarker.Auto())
+            {
+                for (int i = 0, count = m_actions.Length; i < count; ++i)
+                {
+                    m_actions[i].Initialize();
+                }
+            }
 		}
 
 		/// <summary>
@@ -241,20 +249,22 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		private void UpdateUtilities()
 		{
-			Profiler.BeginSample("Brain.UpdateUtilities");
+            using (BrainUpdateUtilitiesMarker.Auto())
+            {
+                for (int i = 0, count = m_utilities.Length; i < count; ++i)
+                {
+                    Consideration consideration = m_considerations[i];
 
-			for (int i = 0, count = m_utilities.Length; i < count; ++i)
-			{
-				Consideration consideration = m_considerations[i];
-
-				Profiler.BeginSample(consideration.GetType().FullName);
-
-				m_utilities[i] = consideration.ComputeUtility();
-
-				Profiler.EndSample();
-			}
-
-			Profiler.EndSample();
+#if ENABLE_PROFILER
+                    using (Consideration.GetConsiderationMarker(consideration).Auto())
+                    {
+#endif
+                        m_utilities[i] = consideration.ComputeUtility();
+#if ENABLE_PROFILER
+                    }
+#endif
+                }
+            }
 		}
 
 		/// <summary>
@@ -264,14 +274,13 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		private void UpdateActionUtilities()
 		{
-			Profiler.BeginSample("Brain.UpdateActionUtilities");
-
-			for (int i = 0, count = m_actionUtilities.Length; i < count; ++i)
-			{
-				m_actionUtilities[i] = MultiplyUtilities(i);
-			}
-
-			Profiler.EndSample();
+            using (BrainUpdateActionUtilitiesMarker.Auto())
+            {
+                for (int i = 0, count = m_actionUtilities.Length; i < count; ++i)
+                {
+                    m_actionUtilities[i] = MultiplyUtilities(i);
+                }
+            }
 		}
 
 		/// <summary>
@@ -298,25 +307,24 @@ namespace Zor.UtilityAI.Core
 		/// <returns>Index of an action with the highest utility.</returns>
 		private int FindBestActionIndex()
 		{
-			Profiler.BeginSample("Brain.FindBestActionIndex");
+            using (BrainFindBestActionIndexMarker.Auto())
+            {
+                int bestActionIndex = 0;
+                float bestActionUtility = m_actionUtilities[bestActionIndex];
 
-			int bestActionIndex = 0;
-			float bestActionUtility = m_actionUtilities[bestActionIndex];
+                for (int i = 1, count = m_actionUtilities.Length; i < count; ++i)
+                {
+                    float actionUtility = m_actionUtilities[i];
 
-			for (int i = 1, count = m_actionUtilities.Length; i < count; ++i)
-			{
-				float actionUtility = m_actionUtilities[i];
+                    if (actionUtility > bestActionUtility)
+                    {
+                        bestActionIndex = i;
+                        bestActionUtility = actionUtility;
+                    }
+                }
 
-				if (actionUtility > bestActionUtility)
-				{
-					bestActionIndex = i;
-					bestActionUtility = actionUtility;
-				}
-			}
-
-			Profiler.EndSample();
-
-			return bestActionIndex;
+                return bestActionIndex;
+            }
 		}
 
 		/// <summary>
@@ -329,29 +337,28 @@ namespace Zor.UtilityAI.Core
 		/// <param name="newActionIndex">New action index.</param>
 		private void SwitchAction(int newActionIndex)
 		{
-			Profiler.BeginSample("Brain.TrySwitchAction");
+            using (BrainTrySwitchActionMarker.Auto())
+            {
+                if (m_currentActionIndex == newActionIndex)
+                {
+                    return;
+                }
 
-			if (m_currentActionIndex == newActionIndex)
-			{
-				return;
-			}
+                float currentUtility = m_actionUtilities[m_currentActionIndex];
+                float newUtility = m_actionUtilities[newActionIndex];
 
-			float currentUtility = m_actionUtilities[m_currentActionIndex];
-			float newUtility = m_actionUtilities[newActionIndex];
+                if (newUtility - currentUtility < m_brainSettings.minimalUtilityDifference)
+                {
+                    return;
+                }
 
-			if (newUtility - currentUtility < m_brainSettings.minimalUtilityDifference)
-			{
-				return;
-			}
-
-			Profiler.BeginSample("Brain.SwitchAction");
-
-			m_actions[m_currentActionIndex].End();
-			m_currentActionIndex = newActionIndex;
-			m_actions[m_currentActionIndex].Begin();
-
-			Profiler.EndSample();
-			Profiler.EndSample();
+                using (BrainSwitchActionMarker.Auto())
+                {
+                    m_actions[m_currentActionIndex].End();
+                    m_currentActionIndex = newActionIndex;
+                    m_actions[m_currentActionIndex].Begin();
+                }
+            }
 		}
 
 		/// <summary>
@@ -359,14 +366,13 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		private void DisposeConsiderations()
 		{
-			Profiler.BeginSample("Brain.DisposeConsiderations");
-
-			for (int i = 0, count = m_considerations.Length; i < count; ++i)
-			{
-				m_considerations[i].Dispose();
-			}
-
-			Profiler.EndSample();
+            using (BrainDisposeConsiderationsMarker.Auto())
+            {
+                for (int i = 0, count = m_considerations.Length; i < count; ++i)
+                {
+                    m_considerations[i].Dispose();
+                }
+            }
 		}
 
 		/// <summary>
@@ -374,14 +380,13 @@ namespace Zor.UtilityAI.Core
 		/// </summary>
 		private void DisposeActions()
 		{
-			Profiler.BeginSample("Brain.DisposeActions");
-
-			for (int i = 0, count = m_actions.Length; i < count; ++i)
-			{
-				m_actions[i].Dispose();
-			}
-
-			Profiler.EndSample();
+            using (BrainDisposeActionsMarker.Auto())
+            {
+                for (int i = 0, count = m_actions.Length; i < count; ++i)
+                {
+                    m_actions[i].Dispose();
+                }
+            }
 		}
 	}
 }
