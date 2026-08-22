@@ -2,11 +2,11 @@
 
 using JetBrains.Annotations;
 using UnityEngine;
-using UnityEngine.Profiling;
 using Zor.SimpleBlackboard.Components;
 using Zor.UtilityAI.Core;
 using Zor.UtilityAI.Debugging;
 using Zor.UtilityAI.Serialization;
+using Profiler = Zor.UtilityAI.Profiling.UtilityAIProfiler;
 
 namespace Zor.UtilityAI.Components
 {
@@ -31,7 +31,7 @@ namespace Zor.UtilityAI.Components
 		private Brain m_brain;
 
 		/// <summary>
-		/// Cached <see cref="GameObject.name"/> to use in <see cref="Profiler.BeginSample(string)"/>.
+		/// Cached <see cref="GameObject.name"/> to use as a profiler marker name.
 		/// </summary>
 		private string m_name;
 
@@ -40,11 +40,8 @@ namespace Zor.UtilityAI.Components
 		/// </summary>
 		public void Tick()
 		{
-			Profiler.BeginSample(m_name);
-
+			using var profile = Profiler.Sample(m_name);
 			m_brain.Tick();
-
-			Profiler.EndSample();
 		}
 
 		/// <summary>

@@ -3,7 +3,7 @@
 using System;
 using System.Reflection;
 using JetBrains.Annotations;
-using UnityEngine.Profiling;
+using Profiler = Zor.UtilityAI.Profiling.UtilityAIProfiler;
 
 namespace Zor.UtilityAI.Core
 {
@@ -73,9 +73,8 @@ namespace Zor.UtilityAI.Core
 					continue;
 				}
 
-				Profiler.BeginSample("Setup");
+				using var profile = Profiler.Sample(nameof(SetupableHelper), nameof(CreateSetup));
 				interfaceType.InvokeMember("Setup", BindingFlags.InvokeMethod, null, obj, parameters);
-				Profiler.EndSample();
 
 				return;
 			}
